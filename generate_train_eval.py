@@ -16,7 +16,7 @@ if __name__ == "__main__":
         '-f',
         metavar='train_frac',
         type=float,
-        default=.75,
+        default=.85,
         help=
         'fraction of the dataset that will be separated for training (default .75)'
     )
@@ -58,6 +58,7 @@ if __name__ == "__main__":
     new_csv_name = os.path.splitext(args.input_csv)[0]
     train_csv_path = os.path.join(output_dir, new_csv_name + '_train.csv')
     eval_csv_path = os.path.join(output_dir, new_csv_name + '_eval.csv')
+    print(train_csv_path)
 
     train_df.to_csv(train_csv_path, index=False)
     validation_df.to_csv(eval_csv_path, index=False)

@@ -10,9 +10,10 @@ import argparse
 
 from PIL import Image
 from tqdm import tqdm
+import numpy as np
 from object_detection.utils import dataset_util
 from collections import namedtuple, OrderedDict
-
+import matplotlib.pyplot as plt
 
 def __split(df, group):
     data = namedtuple('data', ['filename', 'object'])
@@ -24,12 +25,27 @@ def __split(df, group):
 
 
 def create_tf_example(group, path, class_dict):
-    with tf.gfile.GFile(os.path.join(path, '{}'.format(group.filename)),
+    '''
+    with tf.io.gfile.GFile(os.path.join(path, '{}'.format(group.filename)),
                         'rb') as fid:
         encoded_jpg = fid.read()
+
     encoded_jpg_io = io.BytesIO(encoded_jpg)
-    image = Image.open(encoded_jpg_io)
+    image = Image.open(encoded_jpg)
     width, height = image.size
+    '''
+    image_path = os.path.join(path, '{}'.format(group.filename))
+    with Image.open(image_path) as image:
+        image = np.array(image)
+        height, width = image.shape[0], image.shape[1]
+        encoded_jpg = image.tobytes()
+
+    '''
+    timage = tf.io.decode_raw(encoded_jpg, tf.uint8)
+    timage = tf.reshape(timage, [height, width, 3])
+    plt.imshow(timage)
+    plt.show()
+    '''
 
     filename = group.filename.encode('utf8')
     image_format = b'jpg'
@@ -49,10 +65,10 @@ def create_tf_example(group, path, class_dict):
             ymax = row['ymax_rel']
 
         elif set(['xmin', 'xmax', 'ymin', 'ymax']).issubset(set(row.index)):
-            xmin = row['xmin'] / width
-            xmax = row['xmax'] / width
-            ymin = row['ymin'] / height
-            ymax = row['ymax'] / height
+            xmin = row['xmin']
+            xmax = row['xmax']
+            ymin = row['ymin']
+            ymax = row['ymax']
 
         xmins.append(xmin)
         xmaxs.append(xmax)
@@ -60,7 +76,15 @@ def create_tf_example(group, path, class_dict):
         ymaxs.append(ymax)
         classes_text.append(row['class'].encode('utf8'))
         classes.append(class_dict[row['class']])
-
+    '''
+    # cut the box
+    image_dir = "path to image dir"
+    image_path = os.path.join(image_dir, '{}'.format(group.filename))
+    image = image[ymin:ymax, xmin:xmax,:]
+    image = Image.fromarray(image)
+    image.save(image_path)
+    return None
+    '''
     tf_example = tf.train.Example(
         features=tf.train.Features(
             feature={
@@ -77,13 +101,13 @@ def create_tf_example(group, path, class_dict):
                 'image/format':
                 dataset_util.bytes_feature(image_format),
                 'image/object/bbox/xmin':
-                dataset_util.float_list_feature(xmins),
+                dataset_util.int64_list_feature(xmins),
                 'image/object/bbox/xmax':
-                dataset_util.float_list_feature(xmaxs),
+                dataset_util.int64_list_feature(xmaxs),
                 'image/object/bbox/ymin':
-                dataset_util.float_list_feature(ymins),
+                dataset_util.int64_list_feature(ymins),
                 'image/object/bbox/ymax':
-                dataset_util.float_list_feature(ymaxs),
+                dataset_util.int64_list_feature(ymaxs),
                 'image/object/class/text':
                 dataset_util.bytes_list_feature(classes_text),
                 'image/object/class/label':
@@ -146,13 +170,16 @@ if __name__ == '__main__':
 
     class_dict = class_dict_from_pbtxt(args.pbtxt_input)
 
-    writer = tf.python_io.TFRecordWriter(args.output_path)
+    #writer = tf.python_io.TFRecordWriter(args.output_path)
+    writer = tf.compat.v1.python_io.TFRecordWriter(args.output_path)
     path = os.path.join(args.image_dir)
     examples = pd.read_csv(args.csv_input)
     grouped = __split(examples, 'filename')
 
     for group in tqdm(grouped, desc='groups'):
         tf_example = create_tf_example(group, path, class_dict)
+        if tf_example == None:
+            continue
         writer.write(tf_example.SerializeToString())
 
     writer.close()

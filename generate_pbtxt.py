@@ -1,6 +1,6 @@
 import pandas as pd
 import argparse
-
+from functools import cmp_to_key
 
 def pbtxt_from_classlist(l, pbtxt_path):
     pbtxt_text = ''
@@ -12,10 +12,25 @@ def pbtxt_from_classlist(l, pbtxt_path):
     with open(pbtxt_path, "w+") as pbtxt_file:
         pbtxt_file.write(pbtxt_text)
 
+'''
+sort by end str
+'''
+def my_cmp(a, b):
+    a_l = a.split('-')
+    b_l = b.split('-')
+    if len(a_l) == 2 and a_l[1].isdigit() and len(b_l) == 2 and b_l[1].isdigit():
+        a = a_l[1]
+        b = b_l[1]
+    if a > b:
+        return 1
+    elif a<b:
+        return -1
+    else:
+        return 0
 
 def pbtxt_from_csv(csv_path, pbtxt_path):
     class_list = list(pd.read_csv(csv_path)['class'].unique())
-    class_list.sort()
+    sorted(class_list, key=cmp_to_key(my_cmp))
 
     pbtxt_from_classlist(class_list, pbtxt_path)
 
